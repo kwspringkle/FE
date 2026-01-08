@@ -21,6 +21,29 @@ export function DishReviewsPage({ dishId }: DishReviewsPageProps) {
   const [loading, setLoading] = useState(true)
   const [showSupportModal, setShowSupportModal] = useState(false)
   const [displayedCount, setDisplayedCount] = useState(10)
+  const [nationalFilter, setNationalFilter] = useState<"ALL" | "日本" | "ベトナム">("ALL")
+
+  const normalizeNational = (value?: string | null): "日本" | "ベトナム" | null => {
+    const v = (value ?? "").trim()
+    if (!v) return null
+    if (v === "日本" || v.includes("日本")) return "日本"
+    const lower = v.toLowerCase()
+    const lowerAscii = v
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+    if (
+      v === "ベトナム" ||
+      v.includes("ベトナム") ||
+      lower.includes("vietnam") ||
+      lowerAscii.includes("vietnam") ||
+      lowerAscii.includes("viet nam") ||
+      lowerAscii === "vn"
+    ) {
+      return "ベトナム"
+    }
+    return null
+  }
 
   // Review form states
   const [rating, setRating] = useState<number>(5)
@@ -31,6 +54,10 @@ export function DishReviewsPage({ dishId }: DishReviewsPageProps) {
   useEffect(() => {
     fetchReviews()
   }, [dishId])
+
+  useEffect(() => {
+    setDisplayedCount(10)
+  }, [nationalFilter])
 
   const fetchReviews = async () => {
     try {
@@ -77,10 +104,22 @@ export function DishReviewsPage({ dishId }: DishReviewsPageProps) {
   }
 
   const handleLoadMore = () => {
-    setDisplayedCount((prev) => Math.min(prev + 10, reviews.length))
+    setDisplayedCount((prev) => Math.min(prev + 10, filteredAndSortedReviews.length))
   }
 
-  const displayedReviews = reviews.slice(0, displayedCount)
+  const filteredAndSortedReviews = reviews
+    .filter((review) => {
+      if (nationalFilter === "ALL") return true
+      return normalizeNational(review.national) === nationalFilter
+    })
+    .slice()
+    .sort((a, b) => {
+      const aTime = new Date(a.date).getTime()
+      const bTime = new Date(b.date).getTime()
+      return bTime - aTime
+    })
+
+  const displayedReviews = filteredAndSortedReviews.slice(0, displayedCount)
 
   return (
     <div className="min-h-screen bg-background">
@@ -116,6 +155,23 @@ export function DishReviewsPage({ dishId }: DishReviewsPageProps) {
           </div>
         ) : (
           <>
+            {/* Filter */}
+            <section className="mb-4">
+              <div className="flex items-center justify-end gap-2">
+                <label className="text-sm text-muted-foreground">国籍</label>
+                <select
+                  value={nationalFilter}
+                  onChange={(e) => setNationalFilter(e.target.value as "ALL" | "日本" | "ベトナム")}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                  aria-label="国籍でフィルター"
+                >
+                  <option value="ALL">すべて</option>
+                  <option value="日本">日本</option>
+                  <option value="ベトナム">ベトナム</option>
+                </select>
+              </div>
+            </section>
+
             {/* Add Review Form */}
             <section className="mb-8">
               <Card className="border-2 border-primary/20">
@@ -179,78 +235,97 @@ export function DishReviewsPage({ dishId }: DishReviewsPageProps) {
             </section>
 
             <section className="space-y-6 mb-8">
-              {displayedReviews.map((review) => (
-                <Card key={review.dishReviewId} className="border-l-4 border-l-primary hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    {/* Review Header */}
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="flex-shrink-0">
-                        {review.avatar ? (
-                          <img
-                            src={review.avatar}
-                            alt={review.fullName}
-                            className="w-14 h-14 rounded-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.style.display = 'none'
-                              target.nextElementSibling?.classList.remove('hidden')
-                            }}
-                          />
-                        ) : null}
-                        <div className={`w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center text-white font-semibold text-lg ${review.avatar ? 'hidden' : ''}`}>
-                          {review.fullName.charAt(0)}
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between gap-2 mb-1">
-                          <div>
-                            <p className="font-semibold text-foreground">{review.fullName}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {new Date(review.date).toLocaleDateString('ja-JP', {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                              })}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                size={18}
-                                className={
-                                  i < Math.floor(review.rate)
-                                    ? "fill-amber-400 text-amber-400"
-                                    : "text-muted-foreground"
-                                }
-                              />
-                            ))}
-                            <span className="text-sm font-medium text-foreground ml-2">
-                              {review.rate.toFixed(1)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+              {filteredAndSortedReviews.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground">該当するレビューがありません</p>
+                </div>
+              ) : (
+                displayedReviews.map((review) => (
+                  (() => {
+                    const rawNational = (review.national ?? "").trim()
+                    const normalized = normalizeNational(rawNational)
+                    const displayNational = normalized ?? rawNational
 
-                    {/* Review Comment */}
-                    <p className="text-sm text-foreground mb-4 text-pretty leading-relaxed pl-18">
-                      {review.comment}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
+                    return (
+                  <Card key={review.dishReviewId} className="border-l-4 border-l-primary hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      {/* Review Header */}
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className="flex-shrink-0">
+                          {review.avatar ? (
+                            <img
+                              src={review.avatar}
+                              alt={review.fullName}
+                              className="w-14 h-14 rounded-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.style.display = 'none'
+                                target.nextElementSibling?.classList.remove('hidden')
+                              }}
+                            />
+                          ) : null}
+                          <div className={`w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center text-white font-semibold text-lg ${review.avatar ? 'hidden' : ''}`}>
+                            {review.fullName.charAt(0)}
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-foreground">{review.fullName}</p>
+                                {displayNational ? (
+                                  <span className="text-xs text-muted-foreground">({displayNational})</span>
+                                ) : null}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {new Date(review.date).toLocaleDateString('ja-JP', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  size={18}
+                                  className={
+                                    i < Math.floor(review.rate)
+                                      ? "fill-amber-400 text-amber-400"
+                                      : "text-muted-foreground"
+                                  }
+                                />
+                              ))}
+                              <span className="text-sm font-medium text-foreground ml-2">
+                                {review.rate.toFixed(1)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Review Comment */}
+                      <p className="text-sm text-foreground mb-4 text-pretty leading-relaxed pl-18">
+                        {review.comment}
+                      </p>
+                    </CardContent>
+                  </Card>
+                    )
+                  })()
+                ))
+              )}
             </section>
 
             {/* Load More Button */}
-            {displayedCount < reviews.length && (
+            {displayedCount < filteredAndSortedReviews.length && (
               <div className="flex justify-center mb-8">
                 <Button
                   onClick={handleLoadMore}
                   size="lg"
                   className="rounded-full px-8 py-6 text-base font-medium bg-yellow-500 hover:bg-yellow-600 text-white transition-colors duration-200"
                 >
-                  もっと見る ({reviews.length - displayedCount}件)
+                  もっと見る ({filteredAndSortedReviews.length - displayedCount}件)
                 </Button>
               </div>
             )}
@@ -270,7 +345,7 @@ export function DishReviewsPage({ dishId }: DishReviewsPageProps) {
       {/* AI Support Modal */}
       <AISupportModal
         isOpen={showSupportModal}
-        onClose={() => setShowSupportModal(!showSupportModal)}
+        onClose={() => setShowSupportModal(false)}
       />
     </div>
   )

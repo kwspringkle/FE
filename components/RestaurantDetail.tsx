@@ -570,7 +570,11 @@ export function RestaurantDetailPage({ restaurantId }: RestaurantDetailPageProps
           ) : (
             <>
               <div className="space-y-6">
-                {reviews.slice(0, 3).map((review) => (
+                {reviews
+                  .slice()
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 3)
+                  .map((review) => (
                   <Card key={review.restaurantReviewId} className="border-l-4 border-l-primary hover:shadow-lg transition-shadow">
                     <CardContent className="p-6">
                       {/* Review Header */}
@@ -595,7 +599,39 @@ export function RestaurantDetailPage({ restaurantId }: RestaurantDetailPageProps
                         <div className="flex-1">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <div>
-                              <p className="font-semibold text-foreground">{review.fullName}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-foreground">{review.fullName}</p>
+                                {(() => {
+                                  const normalizeNational = (value?: string | null): "日本" | "ベトナム" | null => {
+                                    const v = (value ?? "").trim()
+                                    if (!v) return null
+                                    if (v === "日本" || v.includes("日本")) return "日本"
+                                    const lower = v.toLowerCase()
+                                    const lowerAscii = v
+                                      .normalize('NFD')
+                                      .replace(/[\u0300-\u036f]/g, '')
+                                      .toLowerCase()
+                                    if (
+                                      v === "ベトナム" ||
+                                      v.includes("ベトナム") ||
+                                      lower.includes("vietnam") ||
+                                      lowerAscii.includes("vietnam") ||
+                                      lowerAscii.includes("viet nam") ||
+                                      lowerAscii === "vn"
+                                    ) {
+                                      return "ベトナム"
+                                    }
+                                    return null
+                                  }
+
+                                  const raw = (review.national ?? "").trim()
+                                  const displayNational = raw ? (normalizeNational(raw) ?? raw) : null
+
+                                  return displayNational ? (
+                                    <span className="text-xs text-muted-foreground">({displayNational})</span>
+                                  ) : null
+                                })()}
+                              </div>
                               <p className="text-xs text-muted-foreground mt-0.5">
                                 {new Date(review.date).toLocaleDateString('ja-JP', {
                                   year: 'numeric',

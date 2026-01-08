@@ -42,6 +42,34 @@ const formatPrice = (price: number): string => {
   }).format(price)
 }
 
+const normalizeNational = (value?: string | null): "日本" | "ベトナム" | null => {
+  const v = (value ?? "").trim()
+  if (!v) return null
+  if (v === "日本" || v.includes("日本")) return "日本"
+  const lower = v.toLowerCase()
+  const lowerAscii = v
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+  if (
+    v === "ベトナム" ||
+    v.includes("ベトナム") ||
+    lower.includes("vietnam") ||
+    lowerAscii.includes("vietnam") ||
+    lowerAscii.includes("viet nam") ||
+    lowerAscii === "vn"
+  ) {
+    return "ベトナム"
+  }
+  return null
+}
+
+const getDisplayNational = (value?: string | null): string | null => {
+  const raw = (value ?? "").trim()
+  if (!raw) return null
+  return normalizeNational(raw) ?? raw
+}
+
 export function DishDetailPage({ dishRestaurantId, restaurantId }: DishDetailPageProps) {
   const router = useRouter()
   const { location } = useUserLocation()
@@ -735,7 +763,11 @@ export function DishDetailPage({ dishRestaurantId, restaurantId }: DishDetailPag
           ) : (
             <>
               <div className="space-y-6">
-                {reviews.slice(0, 3).map((review) => (
+                {reviews
+                  .slice()
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 3)
+                  .map((review) => (
                   <Card key={review.dishReviewId} className="border-l-4 border-l-primary">
                     <CardContent className="p-6">
                       <div className="flex gap-4">
@@ -759,7 +791,15 @@ export function DishDetailPage({ dishRestaurantId, restaurantId }: DishDetailPag
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-2">
                             <div>
-                              <p className="font-medium text-foreground">{review.fullName}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-foreground">{review.fullName}</p>
+                                {(() => {
+                                  const displayNational = getDisplayNational(review.national)
+                                  return displayNational ? (
+                                    <span className="text-xs text-muted-foreground">({displayNational})</span>
+                                  ) : null
+                                })()}
+                              </div>
                               <p className="text-xs text-muted-foreground mt-0.5">
                                 {new Date(review.date).toLocaleDateString('ja-JP', {
                                   year: 'numeric',

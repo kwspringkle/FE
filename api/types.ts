@@ -241,6 +241,7 @@ export interface DishReview {
   dishReviewId: number;
   dishesName: string;
   fullName: string;
+  national?: string | null;
   rate: number;
 }
 
@@ -277,6 +278,7 @@ export interface RestaurantReview {
   comment: string;
   date: string;
   fullName: string;
+  national?: string | null;
   rating: number;
   restaurantName: string;
   restaurantReviewId: number;

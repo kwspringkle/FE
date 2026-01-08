@@ -87,7 +87,7 @@ export function TopHeader({ userAvatar = null }: TopHeaderProps) {
           </div>
           
           {showProfileMenu && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-background border rounded-lg shadow-lg z-50"
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50"
             >
               <Link
                 href="/profile"

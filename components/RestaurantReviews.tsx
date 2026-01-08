@@ -125,6 +125,36 @@ export function RestaurantReviewsPage({ restaurantId }: RestaurantReviewsPagePro
   const [showFilterMenu, setShowFilterMenu] = useState(false)
   const [showSupportModal, setShowSupportModal] = useState(false)
 
+  const [nationalFilter, setNationalFilter] = useState<"ALL" | "日本" | "ベトナム">("ALL")
+
+  const normalizeNational = (value?: string | null): "日本" | "ベトナム" | null => {
+    const v = (value ?? "").trim()
+    if (!v) return null
+    if (v === "日本" || v.includes("日本")) return "日本"
+    const lower = v.toLowerCase()
+    const lowerAscii = v
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+    if (
+      v === "ベトナム" ||
+      v.includes("ベトナム") ||
+      lower.includes("vietnam") ||
+      lowerAscii.includes("vietnam") ||
+      lowerAscii.includes("viet nam") ||
+      lowerAscii === "vn"
+    ) {
+      return "ベトナム"
+    }
+    return null
+  }
+
+  const getDisplayNational = (value?: string | null): string | null => {
+    const raw = (value ?? "").trim()
+    if (!raw) return null
+    return normalizeNational(raw) ?? raw
+  }
+
   // Review form states
   const [rating, setRating] = useState<number>(5)
   const [comment, setComment] = useState("")
@@ -134,6 +164,10 @@ export function RestaurantReviewsPage({ restaurantId }: RestaurantReviewsPagePro
   const [reviews, setReviews] = useState<RestaurantReview[]>([])
   const [loadingReviews, setLoadingReviews] = useState(false)
   const [displayedCount, setDisplayedCount] = useState(10)
+
+  useEffect(() => {
+    setDisplayedCount(10)
+  }, [nationalFilter])
 
   // Fetch reviews if restaurantId is provided
   useEffect(() => {
@@ -190,8 +224,16 @@ export function RestaurantReviewsPage({ restaurantId }: RestaurantReviewsPagePro
   }
 
   const handleLoadMore = () => {
-    setDisplayedCount((prev) => prev + 10)
+    setDisplayedCount((prev) => Math.min(prev + 10, filteredAndSortedReviews.length))
   }
+
+  const filteredAndSortedReviews = reviews
+    .filter((review) => {
+      if (nationalFilter === "ALL") return true
+      return normalizeNational(review.national) === nationalFilter
+    })
+    .slice()
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   // Close filter menu when clicking outside
   useEffect(() => {
@@ -231,6 +273,23 @@ export function RestaurantReviewsPage({ restaurantId }: RestaurantReviewsPagePro
             <h1 className="text-3xl font-bold text-foreground text-center">
               レストランレビュー
             </h1>
+          </section>
+
+          {/* Filter */}
+          <section className="mb-4">
+            <div className="flex items-center justify-end gap-2">
+              <label className="text-sm text-muted-foreground">国籍</label>
+              <select
+                value={nationalFilter}
+                onChange={(e) => setNationalFilter(e.target.value as "ALL" | "日本" | "ベトナム")}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                aria-label="国籍でフィルター"
+              >
+                <option value="ALL">すべて</option>
+                <option value="日本">日本</option>
+                <option value="ベトナム">ベトナム</option>
+              </select>
+            </div>
           </section>
 
           {/* Add Review Form */}
@@ -302,13 +361,13 @@ export function RestaurantReviewsPage({ restaurantId }: RestaurantReviewsPagePro
               <div className="flex justify-center items-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
               </div>
-            ) : reviews.length === 0 ? (
+            ) : filteredAndSortedReviews.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground">レビューがありません</p>
               </div>
             ) : (
               <div className="space-y-6">
-                {reviews.slice(0, displayedCount).map((review) => (
+                {filteredAndSortedReviews.slice(0, displayedCount).map((review) => (
                   <Card
                     key={review.restaurantReviewId}
                     className="border-l-4 border-l-primary hover:shadow-lg transition-shadow"
@@ -340,7 +399,15 @@ export function RestaurantReviewsPage({ restaurantId }: RestaurantReviewsPagePro
                         <div className="flex-1">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <div>
-                              <p className="font-semibold text-foreground">{review.fullName}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-foreground">{review.fullName}</p>
+                                {(() => {
+                                  const displayNational = getDisplayNational(review.national)
+                                  return displayNational ? (
+                                    <span className="text-xs text-muted-foreground">({displayNational})</span>
+                                  ) : null
+                                })()}
+                              </div>
                               <p className="text-xs text-muted-foreground mt-0.5">
                                 {new Date(review.date).toLocaleDateString('ja-JP', {
                                   year: 'numeric',
@@ -378,14 +445,14 @@ export function RestaurantReviewsPage({ restaurantId }: RestaurantReviewsPagePro
                 ))}
 
                 {/* Load More Button */}
-                {displayedCount < reviews.length && (
+                {displayedCount < filteredAndSortedReviews.length && (
                   <div className="flex justify-center mt-8">
                     <Button
                       onClick={handleLoadMore}
                       size="lg"
                       className="rounded-full px-8 py-6 text-base font-medium bg-yellow-500 hover:bg-yellow-600 text-white transition-colors duration-200"
                     >
-                      もっと見る
+                      もっと見る ({filteredAndSortedReviews.length - displayedCount}件)
                     </Button>
                   </div>
                 )}

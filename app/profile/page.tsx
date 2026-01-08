@@ -343,14 +343,24 @@ export default function ProfilePage() {
                   <Label htmlFor="nationality" className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     国籍
                   </Label>
-                  <Input
+                  <select
                     id="nationality"
                     name="nationality"
                     value={formData.nationality}
-                    onChange={handleInputChange}
-                    className="mt-1 border-slate-300 dark:border-slate-600 rounded-full px-4"
-                    placeholder=""
-                  />
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        nationality: e.target.value,
+                      })
+                    }
+                    className="mt-1 h-10 w-full appearance-none rounded-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 text-slate-900 dark:text-slate-100"
+                  >
+                    <option value="" disabled>
+                      国籍を選択
+                    </option>
+                    <option value="ベトナム">ベトナム</option>
+                    <option value="日本">日本</option>
+                  </select>
                 </div>
 
                 <div>
