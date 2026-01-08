@@ -153,6 +153,8 @@ export interface DishRestaurant {
   id: number;
   dishesname: string;
   restaurantname: string;
+  restaurantId?: number;
+  restaurantAddress?: string | null;
   distance: number;
   imageUrl: string;
 }

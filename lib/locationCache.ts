@@ -3,6 +3,8 @@ import { getCurrentUserScope } from "@/lib/userScope"
 const LOCATION_KEY_PREFIX = "userLocation.v1"
 const DISTANCE_CACHE_PREFIX = "distanceCache.v1"
 const LOCATION_PROMPT_DISMISSED_PREFIX = "locationPromptDismissed.v1"
+const LOGIN_SESSION_PREFIX = "loginSession.v1"
+const LOCATION_UPDATE_PROMPT_SEEN_PREFIX = "locationUpdatePromptSeen.v1"
 
 export function getScopedKey(prefix: string, scope: string | null) {
   return scope ? `${prefix}.${scope}` : prefix
@@ -28,6 +30,14 @@ export function getDistanceCacheKey(scope?: string | null) {
 
 export function getPromptDismissedKey(scope?: string | null) {
   return getScopedKey(LOCATION_PROMPT_DISMISSED_PREFIX, scope ?? getCurrentUserScope())
+}
+
+export function getLoginSessionKey(scope?: string | null) {
+  return getScopedKey(LOGIN_SESSION_PREFIX, scope ?? getCurrentUserScope())
+}
+
+export function getLocationUpdatePromptSeenKey(scope?: string | null) {
+  return getScopedKey(LOCATION_UPDATE_PROMPT_SEEN_PREFIX, scope ?? getCurrentUserScope())
 }
 
 export function readDistanceCache(scope?: string | null): DistanceCache {

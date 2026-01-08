@@ -4,7 +4,7 @@ import { DishCard } from "./DishCard"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import type { DishRestaurant } from "@/api/types"
 import { useUserLocation } from "@/components/UserLocationProvider"
-import { getRestaurantDistanceMetersWithCache, mapWithConcurrency, stableHashToInt32 } from "@/lib/vietmapDistance"
+import { getRestaurantDistanceMetersWithCache, mapWithConcurrency } from "@/lib/vietmapDistance"
 import { useEffect, useState } from "react"
 
 interface RecommendedDishesProps {
@@ -46,14 +46,11 @@ export function RecommendedDishes({
       try {
         const meters = await mapWithConcurrency(dishes, 3, async (dish) => {
           try {
-            // We don't have restaurantId/address here; use restaurant name as destination.
-            // Cache key derived from restaurant name.
-            const cacheId = stableHashToInt32(dish.restaurantname)
             return await getRestaurantDistanceMetersWithCache({
               origin: { lat: location.lat, lng: location.lng },
-              restaurantId: cacheId,
+              restaurantId: dish.restaurantId ?? dish.id,
               restaurantName: dish.restaurantname,
-              restaurantAddress: undefined,
+              restaurantAddress: dish.restaurantAddress ?? undefined,
               fallbackDistanceMeters: dish.distance,
             })
           } catch {

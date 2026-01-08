@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { authApi } from '@/api/api';
 import { setAuthToken, removeAuthToken } from '@/api/config';
 import { showToast } from '@/lib/toast';
-import { clearUserLocationAndCaches } from '@/lib/locationCache';
 import { getCurrentUserScope, clearStoredUserScope } from '@/lib/userScope';
+import { getLoginSessionKey } from '@/lib/locationCache';
 import type { LoginRequest, RegisterRequest } from '@/api/types';
 
 interface UseAuthReturn {
@@ -31,6 +31,16 @@ export function useAuth(): UseAuthReturn {
       const response = await authApi.login(data);
       console.log('Login successful, token received');
       setAuthToken(response.token);
+
+      // Mark a new login session so pages can show the "update current location" prompt once.
+      try {
+        const scope = getCurrentUserScope();
+        const sessionId = String(Date.now());
+        localStorage.setItem(getLoginSessionKey(scope), sessionId);
+      } catch {
+        // ignore storage errors
+      }
+
       showToast.success('ログイン成功！');
       router.push('/homepage'); // Redirect to homepage after login
     } catch (err) {
@@ -92,9 +102,8 @@ export function useAuth(): UseAuthReturn {
   };
 
   const logout = () => {
-    // Clear per-user cached location/distances so next login recomputes.
-    const scope = getCurrentUserScope();
-    clearUserLocationAndCaches(scope);
+    // Keep the last saved location for this account.
+    // Next login will prompt whether to update current location.
     clearStoredUserScope();
     removeAuthToken();
     showToast.success('ログアウトしました');

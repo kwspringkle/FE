@@ -15,7 +15,7 @@ import { getAuthToken, removeAuthToken } from "@/api/config"
 import type { Dish, Restaurant, Favorite, DishRestaurant, CategorizedSearchData } from "@/api/types"
 import { useUserLocation } from "@/components/UserLocationProvider"
 import { getRestaurantDistanceMetersWithCache, mapWithConcurrency } from "@/lib/vietmapDistance"
-import { getPromptDismissedKey } from "@/lib/locationCache"
+import { clearDistanceCache, getLocationUpdatePromptSeenKey, getLoginSessionKey } from "@/lib/locationCache"
 
 // Helper function to decode JWT and get username (without @gmail.com)
 const getUsernameFromToken = (): string | null => {
@@ -63,15 +63,28 @@ export default function HomePage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const recommendedRef = useRef<HTMLDivElement>(null)
+  const restaurantAddressCacheRef = useRef<Record<number, string | null>>({})
 
-  const [dismissedLocationPrompt, setDismissedLocationPrompt] = useState(false)
+  const [showLocationUpdatePrompt, setShowLocationUpdatePrompt] = useState(false)
+  const [loginSessionId, setLoginSessionId] = useState<string | null>(null)
 
   const [searchRestaurantDistanceOverrides, setSearchRestaurantDistanceOverrides] = useState<Record<number, number>>({})
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    setDismissedLocationPrompt(localStorage.getItem(getPromptDismissedKey()) === '1')
-  }, [])
+    if (!isAuthenticated) return
+
+    const sessionId = localStorage.getItem(getLoginSessionKey())
+    setLoginSessionId(sessionId)
+
+    if (!sessionId) {
+      setShowLocationUpdatePrompt(false)
+      return
+    }
+
+    const seenForSession = localStorage.getItem(getLocationUpdatePromptSeenKey())
+    setShowLocationUpdatePrompt(seenForSession !== sessionId)
+  }, [isAuthenticated])
 
   const safeCategorizedResults = useMemo(() => {
     return {
@@ -167,14 +180,22 @@ export default function HomePage() {
   }, [router])
 
   const handleEnableLocation = async () => {
-    await requestLocation()
+    const next = await requestLocation()
+    if (next) {
+      // Origin changed => recompute distances.
+      clearDistanceCache()
+      if (typeof window !== 'undefined' && loginSessionId) {
+        localStorage.setItem(getLocationUpdatePromptSeenKey(), loginSessionId)
+      }
+      setShowLocationUpdatePrompt(false)
+    }
   }
 
   const handleSkipLocation = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(getPromptDismissedKey(), '1')
+    if (typeof window !== 'undefined' && loginSessionId) {
+      localStorage.setItem(getLocationUpdatePromptSeenKey(), loginSessionId)
     }
-    setDismissedLocationPrompt(true)
+    setShowLocationUpdatePrompt(false)
   }
 
   // Fetch popular dishes
@@ -221,22 +242,40 @@ export default function HomePage() {
       if (!nearbyRestaurants || nearbyRestaurants.length === 0) return
 
       try {
-        const distances = await mapWithConcurrency(nearbyRestaurants, 3, async (r) => {
+        const results = await mapWithConcurrency(nearbyRestaurants, 3, async (r) => {
+          let address: string | null =
+            (r.address as string | null | undefined) ?? restaurantAddressCacheRef.current[r.id] ?? null
+
+          if (!address) {
+            try {
+              const detail = await restaurantApi.getRestaurantDetail(r.id)
+              address = detail.status === "success" ? detail.data?.address ?? null : null
+              restaurantAddressCacheRef.current[r.id] = address
+            } catch {
+              // keep address null
+            }
+          }
+
           try {
-            return await getRestaurantDistanceMetersWithCache({
+            const distance = await getRestaurantDistanceMetersWithCache({
               origin: { lat: location.lat, lng: location.lng },
               restaurantId: r.id,
               restaurantName: r.name,
-              restaurantAddress: r.address,
+              restaurantAddress: address ?? undefined,
               fallbackDistanceMeters: r.distance,
             })
+            return { distance, address }
           } catch {
-            return r.distance
+            return { distance: r.distance, address }
           }
         })
 
         const next = nearbyRestaurants
-          .map((r, idx) => ({ ...r, distance: distances[idx] }))
+          .map((r, idx) => ({
+            ...r,
+            distance: results[idx]?.distance ?? r.distance,
+            address: results[idx]?.address ?? r.address ?? null,
+          }))
           .sort((a, b) => a.distance - b.distance)
 
         setNearbyRestaurantsUserSorted(next)
@@ -431,7 +470,7 @@ export default function HomePage() {
       <TopHeader userAvatar={userAvatar} />
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {!showSearchResults && isAuthenticated && !location && !dismissedLocationPrompt && (
+        {!showSearchResults && isAuthenticated && showLocationUpdatePrompt && (
           <section className="mb-8">
             <div className="border rounded-lg bg-background p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
