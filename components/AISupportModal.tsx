@@ -24,12 +24,24 @@ interface AIResponse {
   success: boolean
 }
 
+type AISupportContext =
+  | {
+      type: "dish"
+      dishName: string
+      dishDescription?: string | null
+      relatedDishes?: string[]
+    }
+  | {
+      type: "generic"
+    }
+
 interface AISupportModalProps {
   isOpen: boolean
   onClose: () => void
+  context?: AISupportContext
 }
 
-export function AISupportModal({ isOpen, onClose }: AISupportModalProps) {
+export function AISupportModal({ isOpen, onClose, context }: AISupportModalProps) {
   const [mounted, setMounted] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -54,6 +66,29 @@ export function AISupportModal({ isOpen, onClose }: AISupportModalProps) {
     scrollToBottom()
   }, [messages])
 
+  const buildQuestion = (userText: string): string => {
+    const trimmed = userText.trim()
+    if (!trimmed) return trimmed
+
+    if (context?.type === "dish") {
+      const related = (context.relatedDishes ?? [])
+        .map((d) => d?.trim())
+        .filter(Boolean)
+        .slice(0, 8)
+      const relatedText = related.length ? related.join(", ") : "(không có)"
+      const descriptionText = (context.dishDescription ?? "").trim() || "(không có)"
+
+      return [
+        `Tôi đang ở trang chi tiết món ăn.`,
+        `Viết lại script hỗ trợ giới thiệu, Mô tả món "${context.dishName}": ${descriptionText}. Lưu ý trình độ tầm N3, N4 tiếng Nhật.`,
+        `Khi giới thiệu món hãy liệt kê cả một số món ăn liên quan: ${relatedText}.`,
+        `Yêu cầu thêm từ người dùng: ${trimmed}`,
+      ].join("\n")
+    }
+
+    return trimmed
+  }
+
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return
 
@@ -68,13 +103,14 @@ export function AISupportModal({ isOpen, onClose }: AISupportModalProps) {
     setIsLoading(true)
 
     try {
+      const question = buildQuestion(inputValue)
       const response = await fetch('http://127.0.0.1:8000/api/ask', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          question: inputValue
+          question
         })
       })
 

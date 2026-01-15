@@ -19,6 +19,7 @@ interface DishDetailPageProps {
   dishRestaurantId: string
   restaurantId?: string  // Optional: when clicking from restaurant detail page
 }
+const HEADERS = ["特徴：", "味・香り：", "おすすめ理由："];
 
 // Helper function to get image URL with fallback
 const getImageUrl = (url: string | null | undefined): string => {
@@ -531,14 +532,25 @@ export function DishDetailPage({ dishRestaurantId, restaurantId }: DishDetailPag
                   </div>
 
                   {/* Description */}
-                  {dish.description && (
-                    <div>
-                      <p className="text-base text-muted-foreground leading-relaxed">
-                        {dish.description}
-                      </p>
-                    </div>
-                  )}
+                  
+                  {dish.description &&
+                    dish.description.split("\n").map((line, i) => {
+                      const isHeader = HEADERS.includes(line.trim());
 
+                      return (
+                        <p
+                          key={i}
+                          className={`m-0 text-base leading-relaxed ${
+                            isHeader
+                              ? "font-semibold text-foreground mt-3"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {line}
+                        </p>
+                      );
+                    })}
+                  <br></br>
                   {/* Ingredients */}
                   {ingredients.length > 0 && (
                     <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 rounded-xl p-5 border border-yellow-200 dark:border-yellow-800">
@@ -862,6 +874,16 @@ export function DishDetailPage({ dishRestaurantId, restaurantId }: DishDetailPag
         <AISupportModal
           isOpen={showSupportModal}
           onClose={() => setShowSupportModal(!showSupportModal)}
+          context={
+            dish
+              ? {
+                  type: "dish",
+                  dishName: dish.dishesname,
+                  dishDescription: dish.description,
+                  relatedDishes: relatedDishes.map((d) => d.name),
+                }
+              : { type: "generic" }
+          }
         />
       </main>
     </div>
